@@ -5,6 +5,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import torch
 from Utilidades.lab_comun import cargar_modelo, leer_prompt
+from Utilidades.prediccion import siguiente_token
+from Utilidades.tensores import a_numpy
 
 texto = leer_prompt("Experimento 01: instrumentación de Q")
 
@@ -98,3 +100,12 @@ print(
     "Diferencia máxima:",
     (registro["Q"] - Q_recalculado).abs().max().item()
 )
+
+# 9. Token que predice el modelo
+token_id, token_predicho = siguiente_token(tokenizer, outputs.logits)
+
+# 10. Copias en NumPy para el Variable Explorer de Spyder.
+# Los tensores originales (registro, Q_recalculado) no se modifican.
+registro_np = a_numpy(registro)
+Q_recalculado_np = a_numpy(Q_recalculado)
+entradas_np = a_numpy(dict(inputs))

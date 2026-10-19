@@ -7,6 +7,8 @@ import torch
 import torch.nn as nn
 
 from Utilidades.lab_comun import cargar_modelo, leer_prompt
+from Utilidades.prediccion import siguiente_token
+from Utilidades.tensores import a_numpy
 
 # ==========================================
 # 1. CARGAR MODELO
@@ -264,3 +266,15 @@ print(
     "Diferencia máxima última posición:",
     diff_logits[0, -1].max().item()
 )
+
+_, token_original_texto = siguiente_token(tokenizer, original)
+_, token_intervenido_texto = siguiente_token(tokenizer, intervenido)
+
+# ==========================================
+# COPIAS EN NUMPY PARA EL VARIABLE EXPLORER
+# ==========================================
+# Los tensores originales (capturas, original, intervenido) no se modifican.
+
+capturas_np = a_numpy(capturas)
+logits_original_np = a_numpy(original)
+logits_intervenido_np = a_numpy(intervenido)

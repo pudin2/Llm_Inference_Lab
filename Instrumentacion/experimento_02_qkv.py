@@ -7,6 +7,8 @@ import torch
 import torch.nn.functional as F
 
 from Utilidades.lab_comun import cargar_modelo, leer_prompt
+from Utilidades.prediccion import siguiente_token
+from Utilidades.tensores import a_numpy
 
 # ==========================================
 # 1. CONFIGURACIÓN
@@ -151,4 +153,14 @@ print("Multiplicaciones:", total_mult)
 print("Sumas:", total_sumas)
 print("Operaciones:", total_mult + total_sumas)
 
+token_id, token_predicho = siguiente_token(tokenizer, outputs.logits)
+
 print("\nEXPERIMENTO FINALIZADO")
+
+# ==========================================
+# 8. COPIAS EN NUMPY PARA EL VARIABLE EXPLORER
+# ==========================================
+# Los tensores originales (registros) no se modifican.
+
+registros_np = a_numpy(registros)
+entradas_np = a_numpy(dict(inputs))
