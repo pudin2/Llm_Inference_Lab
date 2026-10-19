@@ -1,28 +1,15 @@
+﻿import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from Utilidades.lab_comun import cargar_modelo, leer_prompt
 
-MODEL_PATH = (
-    r"D:\Proyectos\Proyectos Python"
-    r"\Llm-Lab\Modelo\SmolLM2-135M"
-)
-
-torch.set_num_threads(2)
+texto = leer_prompt("Experimento 01: instrumentación de Q")
 
 # 1. Cargar modelo
-tokenizer = AutoTokenizer.from_pretrained(
-    MODEL_PATH,
-    local_files_only=True
-)
-
-model = AutoModelForCausalLM.from_pretrained(
-    MODEL_PATH,
-    dtype=torch.float32,
-    attn_implementation="eager",
-    local_files_only=True
-)
-
-model.eval()
-model.to("cpu")
+tokenizer, model = cargar_modelo()
 
 # 2. Seleccionar la primera proyección Q
 q_proj = model.model.layers[0].self_attn.q_proj
@@ -61,7 +48,7 @@ handle = q_proj.register_forward_hook(hook_q)
 
 # 5. Ejecutar inferencia
 inputs = tokenizer(
-    "Artificial intelligence is",
+    texto,
     return_tensors="pt"
 )
 

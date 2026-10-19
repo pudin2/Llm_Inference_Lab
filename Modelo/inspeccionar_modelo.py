@@ -1,45 +1,27 @@
+﻿import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+
+from Utilidades.lab_comun import cargar_modelo, leer_prompt
 
 # ==========================================
 # 1. CONFIGURACIÓN
 # ==========================================
 
-MODEL_PATH = (
-    r"D:\Proyectos\Proyectos Python"
-    r"\Llm-Lab\Modelo\SmolLM2-135M"
-)
-
-torch.set_num_threads(2)
+texto = leer_prompt("Inspección del modelo")
 
 print("=== LABORATORIO LLM ===")
 
 # ==========================================
-# 2. CARGAR TOKENIZADOR
+# 2. CARGAR TOKENIZADOR Y MODELO
 # ==========================================
 
-tokenizer = AutoTokenizer.from_pretrained(
-    MODEL_PATH,
-    local_files_only=True
-)
+tokenizer, model = cargar_modelo()
 
-print("Tokenizador cargado.")
-
-# ==========================================
-# 3. CARGAR MODELO
-# ==========================================
-
-model = AutoModelForCausalLM.from_pretrained(
-    MODEL_PATH,
-    dtype=torch.float32,
-    attn_implementation="eager",
-    local_files_only=True
-)
-
-model.to("cpu")
-model.eval()
-
-print("Modelo cargado.")
+print("Tokenizador y modelo cargados.")
 
 # ==========================================
 # 4. INFORMACIÓN DEL MODELO
@@ -58,8 +40,6 @@ print("Parámetros:", total)
 # ==========================================
 # 5. TOKENIZACIÓN
 # ==========================================
-
-texto = "Artificial intelligence is"
 
 inputs = tokenizer(
     texto,

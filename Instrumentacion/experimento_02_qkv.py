@@ -1,33 +1,20 @@
+﻿import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import torch
 import torch.nn.functional as F
 
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from Utilidades.lab_comun import cargar_modelo, leer_prompt
 
 # ==========================================
 # 1. CONFIGURACIÓN
 # ==========================================
 
-MODEL_PATH = (
-    r"D:\Proyectos\Proyectos Python"
-    r"\Llm-Lab\Modelo\SmolLM2-135M"
-)
+texto = leer_prompt("Experimento 02: instrumentación de Q, K y V")
 
-torch.set_num_threads(2)
-
-tokenizer = AutoTokenizer.from_pretrained(
-    MODEL_PATH,
-    local_files_only=True
-)
-
-model = AutoModelForCausalLM.from_pretrained(
-    MODEL_PATH,
-    dtype=torch.float32,
-    attn_implementation="eager",
-    local_files_only=True
-)
-
-model.to("cpu")
-model.eval()
+tokenizer, model = cargar_modelo()
 
 # ==========================================
 # 2. LOCALIZAR LA PRIMERA CAPA
@@ -92,8 +79,6 @@ for nombre, modulo in proyecciones.items():
 # ==========================================
 # 5. EJECUTAR INFERENCIA
 # ==========================================
-
-texto = "Artificial intelligence is"
 
 inputs = tokenizer(
     texto,

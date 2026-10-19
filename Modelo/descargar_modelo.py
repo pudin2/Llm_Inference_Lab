@@ -1,10 +1,13 @@
-from huggingface_hub import snapshot_download
+﻿import sys
 from pathlib import Path
 
-# Carpeta raíz del laboratorio.
-PROYECTO = Path(r"C:\LLM-Lab")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-MODELO = PROYECTO / "02_modelo" / "SmolLM2-135M"
+from huggingface_hub import snapshot_download
+
+from Utilidades.lab_comun import MODEL_PATH
+
+MODELO = MODEL_PATH
 
 MODELO.mkdir(parents=True, exist_ok=True)
 
