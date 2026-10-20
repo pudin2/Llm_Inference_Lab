@@ -10,157 +10,170 @@ from Utilidades.lab_comun import cargar_modelo, leer_prompt
 from Utilidades.prediccion import siguiente_token
 from Utilidades.tensores import a_numpy
 
-# ==========================================
-# 1. CONFIGURACIÓN
-# ==========================================
 
-texto = leer_prompt("Experimento 02: instrumentación de Q, K y V")
+def ejecutar(prompt, tokenizer, model):
+    """Experimento 02: instrumentación de las proyecciones Q, K y V.
 
-tokenizer, model = cargar_modelo()
+    Devuelve un diccionario con los tensores capturados, sus copias en
+    NumPy (sufijo _np) y el token que predice el modelo.
+    """
 
-# ==========================================
-# 2. LOCALIZAR LA PRIMERA CAPA
-# ==========================================
+    # ==========================================
+    # 1. LOCALIZAR LA PRIMERA CAPA
+    # ==========================================
 
-attention = model.model.layers[0].self_attn
+    attention = model.model.layers[0].self_attn
 
-proyecciones = {
-    "Q": attention.q_proj,
-    "K": attention.k_proj,
-    "V": attention.v_proj
-}
+    proyecciones = {
+        "Q": attention.q_proj,
+        "K": attention.k_proj,
+        "V": attention.v_proj
+    }
 
-registros = {}
-handles = []
+    registros = {}
+    handles = []
 
-# ==========================================
-# 3. CREAR INSTRUMENTACIÓN
-# ==========================================
+    # ==========================================
+    # 2. CREAR INSTRUMENTACIÓN
+    # ==========================================
 
-def crear_hook(nombre):
+    def crear_hook(nombre):
 
-    def hook(module, inputs, output):
+        def hook(module, inputs, output):
 
-        X = inputs[0]
+            X = inputs[0]
 
-        W = module.weight
+            W = module.weight
 
-        M = X.numel() // module.in_features
-        K = module.in_features
-        N = module.out_features
+            M = X.numel() // module.in_features
+            K = module.in_features
+            N = module.out_features
 
-        multiplicaciones = M * K * N
+            multiplicaciones = M * K * N
 
-        sumas = M * N * (K - 1)
+            sumas = M * N * (K - 1)
 
-        if module.bias is not None:
-            sumas += M * N
+            if module.bias is not None:
+                sumas += M * N
 
-        registros[nombre] = {
-            "entrada": X.detach().clone(),
-            "pesos": W.detach().clone(),
-            "salida": output.detach().clone(),
-            "multiplicaciones": multiplicaciones,
-            "sumas": sumas
-        }
+            registros[nombre] = {
+                "entrada": X.detach().clone(),
+                "pesos": W.detach().clone(),
+                "salida": output.detach().clone(),
+                "multiplicaciones": multiplicaciones,
+                "sumas": sumas
+            }
 
-    return hook
+        return hook
 
-# ==========================================
-# 4. INSTALAR HOOKS
-# ==========================================
+    # ==========================================
+    # 3. INSTALAR HOOKS
+    # ==========================================
 
-for nombre, modulo in proyecciones.items():
+    for nombre, modulo in proyecciones.items():
 
-    handle = modulo.register_forward_hook(
-        crear_hook(nombre)
-    )
-
-    handles.append(handle)
-
-# ==========================================
-# 5. EJECUTAR INFERENCIA
-# ==========================================
-
-inputs = tokenizer(
-    texto,
-    return_tensors="pt"
-)
-
-try:
-    with torch.inference_mode():
-        outputs = model(
-            **inputs,
-            use_cache=False
+        handle = modulo.register_forward_hook(
+            crear_hook(nombre)
         )
 
-finally:
-    for handle in handles:
-        handle.remove()
+        handles.append(handle)
 
-# ==========================================
-# 6. MOSTRAR Y VALIDAR RESULTADOS
-# ==========================================
+    # ==========================================
+    # 4. EJECUTAR INFERENCIA
+    # ==========================================
 
-total_mult = 0
-total_sumas = 0
-
-for nombre, datos in registros.items():
-
-    modulo = proyecciones[nombre]
-
-    print(f"\n=== PROYECCIÓN {nombre} ===")
-
-    print("Entrada:", tuple(datos["entrada"].shape))
-    print("Pesos:", tuple(datos["pesos"].shape))
-    print("Salida:", tuple(datos["salida"].shape))
-
-    print("Multiplicaciones:", datos["multiplicaciones"])
-    print("Sumas:", datos["sumas"])
-
-    recalculado = F.linear(
-        datos["entrada"],
-        datos["pesos"],
-        modulo.bias
+    inputs = tokenizer(
+        prompt,
+        return_tensors="pt"
     )
 
-    diferencia = (
-        datos["salida"] - recalculado
-    ).abs().max().item()
+    try:
+        with torch.inference_mode():
+            outputs = model(
+                **inputs,
+                use_cache=False
+            )
 
-    print(
-        "Equivalencia:",
-        torch.allclose(
-            datos["salida"],
-            recalculado,
-            rtol=1e-5,
-            atol=1e-6
+    finally:
+        for handle in handles:
+            handle.remove()
+
+    # ==========================================
+    # 5. MOSTRAR Y VALIDAR RESULTADOS
+    # ==========================================
+
+    total_mult = 0
+    total_sumas = 0
+
+    for nombre, datos in registros.items():
+
+        modulo = proyecciones[nombre]
+
+        print(f"\n=== PROYECCIÓN {nombre} ===")
+
+        print("Entrada:", tuple(datos["entrada"].shape))
+        print("Pesos:", tuple(datos["pesos"].shape))
+        print("Salida:", tuple(datos["salida"].shape))
+
+        print("Multiplicaciones:", datos["multiplicaciones"])
+        print("Sumas:", datos["sumas"])
+
+        recalculado = F.linear(
+            datos["entrada"],
+            datos["pesos"],
+            modulo.bias
         )
-    )
 
-    print("Diferencia máxima:", diferencia)
+        diferencia = (
+            datos["salida"] - recalculado
+        ).abs().max().item()
 
-    total_mult += datos["multiplicaciones"]
-    total_sumas += datos["sumas"]
+        print(
+            "Equivalencia:",
+            torch.allclose(
+                datos["salida"],
+                recalculado,
+                rtol=1e-5,
+                atol=1e-6
+            )
+        )
 
-# ==========================================
-# 7. RESULTADO CONSOLIDADO
-# ==========================================
+        print("Diferencia máxima:", diferencia)
 
-print("\n=== TOTAL Q + K + V ===")
+        total_mult += datos["multiplicaciones"]
+        total_sumas += datos["sumas"]
 
-print("Multiplicaciones:", total_mult)
-print("Sumas:", total_sumas)
-print("Operaciones:", total_mult + total_sumas)
+    # ==========================================
+    # 6. RESULTADO CONSOLIDADO
+    # ==========================================
 
-token_id, token_predicho = siguiente_token(tokenizer, outputs.logits)
+    print("\n=== TOTAL Q + K + V ===")
 
-print("\nEXPERIMENTO FINALIZADO")
+    print("Multiplicaciones:", total_mult)
+    print("Sumas:", total_sumas)
+    print("Operaciones:", total_mult + total_sumas)
 
-# ==========================================
-# 8. COPIAS EN NUMPY PARA EL VARIABLE EXPLORER
-# ==========================================
-# Los tensores originales (registros) no se modifican.
+    token_id, token_predicho = siguiente_token(tokenizer, outputs.logits)
 
-registros_np = a_numpy(registros)
-entradas_np = a_numpy(dict(inputs))
+    print("\nEXPERIMENTO FINALIZADO")
+
+    # ==========================================
+    # 7. RESULTADOS: ORIGINALES Y COPIAS EN NUMPY
+    # ==========================================
+
+    return {
+        "prompt": prompt,
+        "token_id": token_id,
+        "token_predicho": token_predicho,
+        "registros": registros,
+        "registros_np": a_numpy(registros),
+        "entradas_np": a_numpy(dict(inputs)),
+    }
+
+
+if __name__ == "__main__":
+    texto = leer_prompt("Experimento 02: instrumentación de Q, K y V")
+
+    tokenizer, model = cargar_modelo()
+
+    resultado = ejecutar(texto, tokenizer, model)
